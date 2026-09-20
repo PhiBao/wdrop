@@ -55,6 +55,60 @@ Three screens, one job — turn "I owe you crypto" from a trust fall into a link
 What wdrop is **not**: an invoice engine, a payroll dashboard, a swap UI, a chatbot, a token.
 Deliberately. Small real system > large fake system.
 
+## How it works (60-second version)
+
+No backend exists — static UI + wallet calls + one escrow contract on Arc. Secrets never leave
+the browser (URL fragment only); memos stay in localStorage.
+
+```mermaid
+flowchart LR
+    subgraph Browser["Browser"]
+        UI["wdrop app<br/>create · claim · undo · receipts"]
+        WALLET["Wallet<br/>injected or WalletConnect"]
+    end
+    subgraph ARC["Arc mainnet · 5042"]
+        WD["WDrop escrow<br/>0xEfFd…60F7"]
+        USDC["USDC<br/>payment + gas"]
+    end
+    UI --> WALLET
+    WALLET -->|"approve + create<br/>claim / reclaim"| WD
+    WD <--> USDC
+    WD -->|"every step"| EXPL["Explorer proof"]
+```
+
+A drop lives in exactly one state at a time, and each `id` is single-use — once it leaves
+`Locked` it can never move again:
+
+```mermaid
+stateDiagram-v2
+    [*] --> Locked : create + lock USDC
+    Locked --> Claimed : claim with secret
+    Locked --> Reclaimed : sender undo, anytime
+    Locked --> Swept : expired → anyone sweeps back
+    Claimed --> [*]
+    Reclaimed --> [*]
+    Swept --> [*]
+```
+
+The receiver sees the **real onchain amount before connecting** — a "$100 (actually $1)" scam
+link is exposed without spending gas:
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor S as Sender
+    actor R as Receiver
+    participant WD as WDrop (Arc)
+    S ->> WD : approve + create → claim link
+    S ->> R : shares link (any channel)
+    R ->> WD : opens link, reads amount onchain
+    R ->> WD : claim(secret) → USDC in <1s
+    WD -->> S : or sender reclaims / expiry sweeps back
+```
+
+Full diagrams (undo/expiry paths, trust boundaries, receipts, deployment):
+[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
+
 ## Why Arc (not "deployed on Arc too")
 
 - **USDC as gas** — a $1 protected drop costs cents to lock and claim. On ETH-gas chains the

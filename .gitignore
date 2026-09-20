@@ -1,0 +1,12 @@
+# local env (keys, deployer config) — never commit
+.env
+.env.local
+*.local
+
+# build outputs
+node_modules/
+.next/
+out/
+cache/
+dist/
+*.tsbuildinfo

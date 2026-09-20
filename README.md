@@ -209,3 +209,7 @@ Full runbook: [`docs/DEPLOY.md`](docs/DEPLOY.md).
 
 MVP for Arc Microgrants — live, proven, submitted soon. Remaining: demo video + builder profile
 link (see [`docs/SUBMISSION.md`](docs/SUBMISSION.md)).
+
+## License
+
+MIT © 2026 Kiter — see [LICENSE](LICENSE). Fork it, build on it.

@@ -14,7 +14,9 @@ function arcTransport() {
     process.env.NEXT_PUBLIC_ARC_RPC_URL,
     process.env.NEXT_PUBLIC_ARC_RPC_FALLBACK,
   ].filter((u): u is string => !!u);
-  return urls.length ? fallback(urls.map((url) => http(url))) : http();
+  // rank:true routes to whichever endpoint is fastest from the user, with the
+  // other as automatic failover — paid QN for headroom, public as backup.
+  return urls.length ? fallback(urls.map((url) => http(url)), { rank: true }) : http();
 }
 
 const wcProjectId = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID;

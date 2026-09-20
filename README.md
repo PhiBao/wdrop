@@ -89,6 +89,8 @@ success receipts. Contract: 10/10 Foundry tests; frontend: `tsc` + `eslint` + pr
 - **No backend, no database, no custody.** Memos stay in the sender's browser; the secret never
   leaves the URL fragment. See [`docs/SECURITY.md`](docs/SECURITY.md) (includes honest known
   limits: bearer-link claim race, receiver needs gas, no onchain privacy yet).
+- Full system diagrams: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — overview, state
+  machine, lock/claim/undo sequences, trust boundaries, receipts flow, deployment topology.
 - Docs: [`docs/DEPLOY.md`](docs/DEPLOY.md) · [`docs/DEMO.md`](docs/DEMO.md) (75s script) ·
   [`docs/SECURITY.md`](docs/SECURITY.md) · [`docs/SUBMISSION.md`](docs/SUBMISSION.md)
 

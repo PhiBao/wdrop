@@ -5,18 +5,8 @@ import Link from "next/link";
 import { useAccount, useChainId, usePublicClient, useWriteContract } from "wagmi";
 import { WDROP_ADDRESS, arcMainnet, explorerAddress, explorerTx, isConfigured } from "@/lib/arc";
 import { DROP_STATUS, wdropAbi } from "@/lib/abi";
-import { fmtTime, fmtUsdc, readFragmentSecret, shortHash } from "@/lib/wdrop";
+import { fmtTime, fmtUsdc, readFragmentSecret, shortHash, toDropData, type DropData } from "@/lib/wdrop";
 import { WalletButton } from "@/components/WalletButton";
-
-type Drop = {
-  token: string;
-  sender: string;
-  arbiter: string;
-  amount: bigint;
-  createdAt: number;
-  expiry: number;
-  status: number;
-};
 
 export default function ClaimPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -25,7 +15,7 @@ export default function ClaimPage({ params }: { params: Promise<{ id: string }> 
   const publicClient = usePublicClient();
   const { writeContractAsync } = useWriteContract();
   const [secret] = useState<string | null>(() => readFragmentSecret());
-  const [drop, setDrop] = useState<Drop | null>(null);
+  const [drop, setDrop] = useState<DropData | null>(null);
   const [claimable, setClaimable] = useState(false);
   const [loading, setLoading] = useState(() => isConfigured);
   const [busy, setBusy] = useState(false);
@@ -37,21 +27,14 @@ export default function ClaimPage({ params }: { params: Promise<{ id: string }> 
     let cancelled = false;
     (async () => {
       try {
-        const d = (await publicClient.readContract({
+        const raw = await publicClient.readContract({
           address: WDROP_ADDRESS,
           abi: wdropAbi,
           functionName: "getDrop",
           args: [BigInt(id)],
-        })) as unknown as Drop;
-        if (cancelled) return;
-        // viem returns expiry/createdAt as bigint
-        setDrop({
-          ...d,
-          amount: BigInt(d.amount as unknown as string),
-          expiry: Number(d.expiry),
-          createdAt: Number(d.createdAt),
-          status: Number(d.status),
         });
+        if (cancelled) return;
+        setDrop(toDropData(raw));
         try {
           const c = (await publicClient.readContract({
             address: WDROP_ADDRESS,

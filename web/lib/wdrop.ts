@@ -45,6 +45,39 @@ export function shortHash(h: string): string {
   return h.length > 12 ? `${h.slice(0, 6)}…${h.slice(-4)}` : h;
 }
 
+export type DropData = {
+  token: string;
+  sender: string;
+  arbiter: string;
+  amount: bigint;
+  createdAt: number;
+  expiry: number;
+  claimHash: string;
+  status: number;
+};
+
+/**
+ * Normalize a getDrop return value. viem decodes structs as index-keyed
+ * tuples (d[3], not d.amount) — named access returns undefined and crashes
+ * formatters downstream. Accepts either shape so this survives SDK changes.
+ */
+export function toDropData(d: unknown): DropData {
+  const arr = (Array.isArray(d) ? d : []) as unknown[];
+  const obj = ((d ?? {}) as Record<string, unknown>);
+  const pick = (i: number, name: string): unknown =>
+    obj[name] !== undefined ? obj[name] : arr[i];
+  return {
+    token: String(pick(0, "token")),
+    sender: String(pick(1, "sender")),
+    arbiter: String(pick(2, "arbiter")),
+    amount: BigInt(pick(3, "amount") as string | number | bigint),
+    createdAt: Number(pick(4, "createdAt") as string | number | bigint),
+    expiry: Number(pick(5, "expiry") as string | number | bigint),
+    claimHash: String(pick(6, "claimHash")),
+    status: Number(pick(7, "status") as string | number),
+  };
+}
+
 export type DropMeta = { memo?: string; createdAt?: number };
 
 // ---- local receipts: drops this browser created (memo + secret backup) ----

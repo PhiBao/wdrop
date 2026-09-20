@@ -5,7 +5,7 @@ import { useAccount, useChainId, usePublicClient, useWriteContract } from "wagmi
 import { parseEventLogs } from "viem";
 import { WDROP_ADDRESS, arcMainnet, explorerTx, isConfigured } from "@/lib/arc";
 import { DROP_STATUS, createdEvent, wdropAbi } from "@/lib/abi";
-import { buildClaimLink, fmtTime, fmtUsdc, loadMyDrops } from "@/lib/wdrop";
+import { buildClaimLink, fmtTime, fmtUsdc, loadMyDrops, toDropData } from "@/lib/wdrop";
 
 type Row = {
   id: string;
@@ -47,14 +47,17 @@ export function MyDrops() {
       const metas = loadMyDrops();
       const out: Row[] = [];
       for (const l of logs) {
-        const parsed = parseEventLogs({ abi: wdropAbi, logs: [l], eventName: "Created" })[0];
-        const id = (parsed.args.id as bigint).toString();
-        const d = (await publicClient.readContract({
-          address: WDROP_ADDRESS,
-          abi: wdropAbi,
-          functionName: "getDrop",
-          args: [BigInt(id)],
-        })) as unknown as { amount: bigint; expiry: number; status: number };
+        try {
+          const parsed = parseEventLogs({ abi: wdropAbi, logs: [l], eventName: "Created" })[0];
+          const id = (parsed.args.id as bigint).toString();
+          const d = toDropData(
+            await publicClient.readContract({
+              address: WDROP_ADDRESS,
+              abi: wdropAbi,
+              functionName: "getDrop",
+              args: [BigInt(id)],
+            })
+          );
         let claimable = false;
         try {
           claimable = (await publicClient.readContract({
@@ -65,16 +68,20 @@ export function MyDrops() {
           })) as boolean;
         } catch { /* ignore */ }
         const meta = metas[`${chainId}:${id}`];
-        out.push({
-          id,
-          amount: d.amount,
-          expiry: Number(d.expiry),
-          status: Number(d.status),
-          claimable,
-          txHash: l.transactionHash!,
-          memo: meta?.memo,
-          secret: meta?.secret,
-        });
+          out.push({
+            id,
+            amount: d.amount,
+            expiry: d.expiry,
+            status: d.status,
+            claimable,
+            txHash: l.transactionHash!,
+            memo: meta?.memo,
+            secret: meta?.secret,
+          });
+        } catch (rowErr) {
+          // One unloadable drop must not kill the whole list.
+          console.warn("Skipping unloadable drop", rowErr);
+        }
       }
       out.sort((a, b) => Number(BigInt(b.id) - BigInt(a.id)));
       setRows(out);

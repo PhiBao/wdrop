@@ -2,10 +2,11 @@
 
 import { use, useEffect, useState } from "react";
 import Link from "next/link";
-import { useAccount, useChainId, usePublicClient, useWriteContract } from "wagmi";
-import { WDROP_ADDRESS, arcMainnet, explorerAddress, explorerTx, isConfigured } from "@/lib/arc";
+import { useAccount, useChainId, useConfig, usePublicClient, useWriteContract } from "wagmi";
+import { WDROP_ADDRESS, explorerAddress, explorerTx, isConfigured } from "@/lib/arc";
 import { DROP_STATUS, wdropAbi } from "@/lib/abi";
 import { fmtTime, fmtUsdc, readFragmentSecret, shortHash, toDropData, type DropData } from "@/lib/wdrop";
+import { ensureWalletChain } from "@/lib/walletGuard";
 import { WalletButton } from "@/components/WalletButton";
 
 export default function ClaimPage({ params }: { params: Promise<{ id: string }> }) {
@@ -13,6 +14,7 @@ export default function ClaimPage({ params }: { params: Promise<{ id: string }> 
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
   const publicClient = usePublicClient();
+  const wagmiConfig = useConfig();
   const { writeContractAsync } = useWriteContract();
   const [secret] = useState<string | null>(() => readFragmentSecret());
   const [drop, setDrop] = useState<DropData | null>(null);
@@ -59,9 +61,9 @@ export default function ClaimPage({ params }: { params: Promise<{ id: string }> 
     if (!publicClient || !address) return;
     setErr(null);
     if (!secret) return setErr("This link is missing its secret (#k=…). Ask the sender for the full link.");
-    if (chainId !== arcMainnet.id) return setErr("Switch to Arc mainnet to claim.");
     setBusy(true);
     try {
+      await ensureWalletChain(wagmiConfig);
       const sim = await publicClient.simulateContract({
         account: address,
         address: WDROP_ADDRESS,

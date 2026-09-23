@@ -4,13 +4,15 @@ import { useState } from "react";
 import {
   useAccount,
   useChainId,
+  useConfig,
   usePublicClient,
   useReadContract,
   useWriteContract,
 } from "wagmi";
 import { parseEventLogs } from "viem";
-import { USDC_ADDRESS, WDROP_ADDRESS, arcMainnet, isConfigured } from "@/lib/arc";
+import { USDC_ADDRESS, WDROP_ADDRESS, isConfigured } from "@/lib/arc";
 import { erc20Abi, wdropAbi } from "@/lib/abi";
+import { ensureWalletChain } from "@/lib/walletGuard";
 import {
   buildClaimLink,
   claimHash,
@@ -29,6 +31,7 @@ const TTLS = [
 export function CreateDrop() {
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
+  const wagmiConfig = useConfig();
   const publicClient = usePublicClient();
   const [amount, setAmount] = useState("2");
   const [ttl, setTTL] = useState(TTLS[1].secs);
@@ -58,7 +61,6 @@ export function CreateDrop() {
     setErr(null);
     setResult(null);
     if (!isConnected || !address) return setErr("Connect a wallet first.");
-    if (chainId !== arcMainnet.id) return setErr("Switch to Arc mainnet to create a drop.");
     if (!isConfigured) return setErr("Contract not deployed yet — set NEXT_PUBLIC_WDROP_ADDRESS.");
     if (!publicClient) return setErr("No public client. Retry in a moment.");
     let value: bigint;
@@ -72,6 +74,8 @@ export function CreateDrop() {
     }
     setPhase("working");
     try {
+      // Ask the wallet which chain it's REALLY on before spending anything.
+      await ensureWalletChain(wagmiConfig);
       // 1. Approve exact amount if needed
       const cur = ((await refetchAllowance()).data ?? BigInt(0)) as bigint;
       if (cur < value) {

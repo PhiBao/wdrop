@@ -1,11 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useEffectEvent, useState } from "react";
-import { useAccount, useChainId, usePublicClient, useWriteContract } from "wagmi";
+import { useAccount, useChainId, useConfig, usePublicClient, useWriteContract } from "wagmi";
 import { parseEventLogs } from "viem";
 import { WDROP_ADDRESS, arcMainnet, explorerTx, isConfigured } from "@/lib/arc";
 import { DROP_STATUS, wdropAbi } from "@/lib/abi";
 import { getLogsCached, sameAddress } from "@/lib/logs";
+import { ensureWalletChain } from "@/lib/walletGuard";
 import { buildClaimLink, fmtTime, fmtUsdc, loadMyDrops, toDropData } from "@/lib/wdrop";
 
 type Row = {
@@ -25,6 +26,7 @@ export function MyDrops() {
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
   const publicClient = usePublicClient();
+  const wagmiConfig = useConfig();
   const { writeContractAsync } = useWriteContract();
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(false);
@@ -119,6 +121,7 @@ export function MyDrops() {
     setErr(null);
     setOk(null);
     try {
+      await ensureWalletChain(wagmiConfig);
       const sim = await publicClient.simulateContract({
         account: address!,
         address: WDROP_ADDRESS,

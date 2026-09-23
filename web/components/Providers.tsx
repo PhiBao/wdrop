@@ -7,12 +7,13 @@ import {
   WagmiProvider,
   createConfig,
   useAccount,
-  useChainId,
+  useConfig,
   useConnection,
   useSwitchChain,
 } from "wagmi";
 import { injected, walletConnect } from "wagmi/connectors";
 import { arcMainnet, arcTestnet } from "@/lib/arc";
+import { walletChainId } from "@/lib/walletGuard";
 
 // RPC: same-origin proxy (app/api/rpc) → QuickNode primary, public failover,
 // token server-side. Direct third-party RPC hosts get executed by adblockers
@@ -32,6 +33,7 @@ export function Providers({ children }: { children: ReactNode }) {
         injected({ shimDisconnect: true }),
         ...(wcProjectId ? [walletConnect({ projectId: wcProjectId })] : []),
       ],
+      multiInjectedProviderDiscovery: false,
       transports: {
         [arcMainnet.id]: arcTransport(),
         [arcTestnet.id]: http(),
@@ -51,68 +53,61 @@ export function Providers({ children }: { children: ReactNode }) {
 /**
  * Auto-switch to Arc on connect.
  *
- * Why this is manual and noisy instead of silent: when Arc is not yet in the
- * wallet, `wallet_switchEthereumChain` fails with 4902 and the wallet shows an
- * "Add Arc network" confirmation dialog. That prompt lives inside the wallet UI,
- * not the page — easy to miss. So: attempt automatically, surface every
- * outcome, and let the in-page banner (WalletButton) take over on failure.
+ * Critical detail: we do NOT trust `useChainId()`. It is seeded with the first
+ * configured chain (Arc 5042), so it reports "already on Arc" even when the
+ * wallet is elsewhere — an auto-switch keyed off it silently does nothing.
+ * We ask the wallet itself via `eth_chainId` (see lib/walletGuard.ts).
  */
 function AutoArc() {
   const { address, isConnected } = useAccount();
-  const chainId = useChainId();
   const { connector } = useConnection();
+  const config = useConfig();
   const { switchChainAsync, isPending } = useSwitchChain();
   const tried = useRef("");
   const lastError = useRef("");
 
-  // Unconditional heartbeat: proves AutoArc is mounted and shows the state the
-  // effect is deciding on. A clean console previously meant "can't tell".
   useEffect(() => {
-    console.info("[wdrop] wallet state", {
-      connected: isConnected,
-      chainId,
-      onArc: chainId === arcMainnet.id,
-      address: address ?? null,
-      connector: connector?.name ?? null,
-    });
-  }, [isConnected, chainId, address, connector]);
-
-  useEffect(() => {
-    if (!isConnected || !address || chainId === arcMainnet.id) return;
-    if (isPending) return;
-    const key = `${connector?.uid ?? "c"}:${address}:${chainId}`;
+    if (!isConnected || !address || isPending) return;
+    const key = `${connector?.uid ?? "c"}:${address}`;
     if (tried.current === key) return;
     tried.current = key;
-    switchChainAsync({ chainId: arcMainnet.id })
-      .then(() => {
-        lastError.current = "";
-        console.info("[wdrop] auto-switched to Arc (5042)");
-      })
-      .catch((e: unknown) => {
-        const err = e as { code?: number; message?: string; details?: string };
-        const msg = err?.message ?? String(e);
-        lastError.current = msg;
-        console.warn("[wdrop] auto-switch to Arc did not complete:", {
-          code: err?.code,
-          message: msg,
-          hint:
-            err?.code === 4902
-              ? "Arc not in wallet yet — approve the 'Add Arc network' prompt in your wallet, or use the Switch to Arc button."
-              : "Use the Switch to Arc button in the header, or switch networks in your wallet.",
-        });
-        // Allow one retry per focus (user may have missed the wallet prompt).
+    let cancelled = false;
+    (async () => {
+      const live = await walletChainId(config);
+      if (cancelled) return;
+      if (live === arcMainnet.id || live === 0) {
         tried.current = "";
-      });
-  }, [isConnected, address, chainId, connector, switchChainAsync, isPending]);
+        return;
+      }
+      try {
+        await switchChainAsync({ chainId: arcMainnet.id });
+        console.info(`[wdrop] auto-switched to Arc from chain ${live}`);
+        tried.current = "";
+      } catch (e: unknown) {
+        const err = e as { code?: number; message?: string };
+        lastError.current = err?.message ?? String(e);
+        console.warn(
+          `[wdrop] auto-switch from chain ${live} did not complete:`,
+          err?.code,
+          err?.message
+        );
+        // Allow retry on next focus/connect (user may have missed the wallet prompt).
+        tried.current = "";
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isConnected, address, connector, config, switchChainAsync, isPending]);
 
   useEffect(() => {
     if (!isConnected) return;
     const onFocus = () => {
-      if (chainId !== arcMainnet.id && lastError.current) tried.current = "";
+      if (lastError.current) tried.current = "";
     };
     window.addEventListener("focus", onFocus);
     return () => window.removeEventListener("focus", onFocus);
-  }, [isConnected, chainId]);
+  }, [isConnected]);
 
   return null;
 }

@@ -7,15 +7,11 @@ import { WagmiProvider, createConfig, useAccount, useChainId, useSwitchChain } f
 import { injected, walletConnect } from "wagmi/connectors";
 import { arcMainnet, arcTestnet } from "@/lib/arc";
 
-// RPC: ORDERED fallback — primary first, never latency-ranked. Ranking routes
-// users to the public RPC (often faster) which rate-limits aggressively.
-// QuickNode first (generous quota), public only if QN errors.
+// RPC: same-origin proxy (app/api/rpc) → QuickNode primary, public failover,
+// token server-side. Direct third-party RPC hosts get executed by adblockers
+// (ERR_BLOCKED_BY_CLIENT) and leak the endpoint token into the JS bundle.
 function arcTransport() {
-  const urls = [
-    process.env.NEXT_PUBLIC_ARC_RPC_URL,
-    process.env.NEXT_PUBLIC_ARC_RPC_FALLBACK,
-  ].filter((u): u is string => !!u);
-  return urls.length ? fallback(urls.map((url) => http(url))) : http();
+  return fallback([http("/api/rpc")]);
 }
 
 const wcProjectId = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID;

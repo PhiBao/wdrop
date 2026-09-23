@@ -4,7 +4,8 @@ import { useCallback, useEffect, useEffectEvent, useState } from "react";
 import { useAccount, useChainId, usePublicClient, useWriteContract } from "wagmi";
 import { parseEventLogs } from "viem";
 import { WDROP_ADDRESS, arcMainnet, explorerTx, isConfigured } from "@/lib/arc";
-import { DROP_STATUS, createdEvent, wdropAbi } from "@/lib/abi";
+import { DROP_STATUS, wdropAbi } from "@/lib/abi";
+import { getLogsCached, sameAddress } from "@/lib/logs";
 import { buildClaimLink, fmtTime, fmtUsdc, loadMyDrops, toDropData } from "@/lib/wdrop";
 
 type Row = {
@@ -37,12 +38,20 @@ export function MyDrops() {
     setLoading(true);
     setErr(null);
     try {
-      const logs = await publicClient.getLogs({
-        address: WDROP_ADDRESS,
-        event: createdEvent[0],
-        args: { sender: address },
-        fromBlock: DEPLOY_BLOCK,
-        toBlock: "latest",
+      // One shared cached scan (see lib/logs): no indexed-arg filters, bisect on
+      // strict RPCs, client-side sender filter here.
+      const logs = (
+        await getLogsCached(publicClient, chainId, {
+          address: WDROP_ADDRESS,
+          fromBlock: DEPLOY_BLOCK,
+        })
+      ).filter((l) => {
+        try {
+          const p = parseEventLogs({ abi: wdropAbi, logs: [l], eventName: "Created" })[0];
+          return sameAddress(p.args.sender as string, address);
+        } catch {
+          return false;
+        }
       });
       const metas = loadMyDrops();
       const out: Row[] = [];

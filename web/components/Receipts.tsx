@@ -2,8 +2,10 @@
 
 import { useState } from "react";
 import { useAccount, useChainId, usePublicClient } from "wagmi";
+import { parseEventLogs } from "viem";
 import { WDROP_ADDRESS, explorerTx, isConfigured } from "@/lib/arc";
-import { claimedEvent, createdEvent, reclaimedEvent, sweptEvent, wdropAbi } from "@/lib/abi";
+import { wdropAbi } from "@/lib/abi";
+import { getLogsCached, sameAddress } from "@/lib/logs";
 import { downloadCsv, fmtUsdc, receiptsCsv, type ReceiptRow } from "@/lib/wdrop";
 
 const DEPLOY_BLOCK = BigInt(process.env.NEXT_PUBLIC_DEPLOY_BLOCK ?? "0");
@@ -21,18 +23,39 @@ export function Receipts() {
     setLoading(true);
     setErr(null);
     try {
-      // Only my own actions: locks I created, claims I received, reclaims/sweeps
-      // back to me. (Claims of my drops by others are visible per-drop in MyDrops.)
-      const [created, claimed, reclaimed, swept] = await Promise.all([
-        publicClient.getLogs({ address: WDROP_ADDRESS, event: createdEvent[0], args: { sender: address }, fromBlock: DEPLOY_BLOCK, toBlock: "latest" }),
-        publicClient.getLogs({ address: WDROP_ADDRESS, event: claimedEvent[0], args: { claimer: address }, fromBlock: DEPLOY_BLOCK, toBlock: "latest" }),
-        publicClient.getLogs({ address: WDROP_ADDRESS, event: reclaimedEvent[0], args: { sender: address }, fromBlock: DEPLOY_BLOCK, toBlock: "latest" }),
-        publicClient.getLogs({ address: WDROP_ADDRESS, event: sweptEvent[0], args: { sender: address }, fromBlock: DEPLOY_BLOCK, toBlock: "latest" }),
-      ]);
+      // One shared cached scan with MyDrops (see lib/logs): all contract logs,
+      // split + filtered client-side. Single request instead of four.
+      const allLogs = await getLogsCached(publicClient, chainId, {
+        address: WDROP_ADDRESS,
+        fromBlock: DEPLOY_BLOCK,
+      });
+      const created: typeof allLogs = [];
+      const claimed: typeof allLogs = [];
+      const reclaimed: typeof allLogs = [];
+      const swept: typeof allLogs = [];
+      for (const l of allLogs) {
+        for (const [name, bucket] of [
+          ["Created", created],
+          ["Claimed", claimed],
+          ["Reclaimed", reclaimed],
+          ["Swept", swept],
+        ] as const) {
+          try {
+            if (parseEventLogs({ abi: wdropAbi, logs: [l], eventName: name }).length) {
+              bucket.push(l);
+              break;
+            }
+          } catch {
+            /* not this event — try next */
+          }
+        }
+      }
       const out: ReceiptRow[] = [];
-      const { parseEventLogs } = await import("viem");
+      const myDropIds = new Set<string>();
       for (const l of created) {
         const p = parseEventLogs({ abi: wdropAbi, logs: [l], eventName: "Created" })[0];
+        if (!sameAddress(p.args.sender as string, address)) continue;
+        myDropIds.add((p.args.id as bigint).toString());
         out.push({
           event: "Locked", dropId: (p.args.id as bigint).toString(),
           amount: fmtUsdc(p.args.amount as bigint), txHash: l.transactionHash!,
@@ -41,14 +64,18 @@ export function Receipts() {
       }
       for (const l of claimed) {
         const p = parseEventLogs({ abi: wdropAbi, logs: [l], eventName: "Claimed" })[0];
+        const id = (p.args.id as bigint).toString();
+        // My claims, plus claims of MY drops by others (someone took my money — I want that receipt).
+        if (!sameAddress(p.args.claimer as string, address) && !myDropIds.has(id)) continue;
         out.push({
-          event: "Claimed", dropId: (p.args.id as bigint).toString(),
+          event: "Claimed", dropId: id,
           amount: fmtUsdc(p.args.amount as bigint), txHash: l.transactionHash!,
           blockNumber: l.blockNumber!.toString(), counterparty: p.args.claimer as string,
         });
       }
       for (const l of reclaimed) {
         const p = parseEventLogs({ abi: wdropAbi, logs: [l], eventName: "Reclaimed" })[0];
+        if (!sameAddress(p.args.sender as string, address)) continue;
         out.push({
           event: "Reclaimed", dropId: (p.args.id as bigint).toString(),
           amount: fmtUsdc(p.args.amount as bigint), txHash: l.transactionHash!,
@@ -57,6 +84,7 @@ export function Receipts() {
       }
       for (const l of swept) {
         const p = parseEventLogs({ abi: wdropAbi, logs: [l], eventName: "Swept" })[0];
+        if (!sameAddress(p.args.sender as string, address)) continue;
         out.push({
           event: "Swept", dropId: (p.args.id as bigint).toString(),
           amount: fmtUsdc(p.args.amount as bigint), txHash: l.transactionHash!,
@@ -66,7 +94,8 @@ export function Receipts() {
       out.sort((a, b) => Number(BigInt(b.blockNumber) - BigInt(a.blockNumber)));
       setRows(out);
     } catch (e) {
-      setErr(e instanceof Error ? e.message : String(e));
+      setErr("Couldn't load receipts — the RPC refused the query. Check your connection and retry.");
+      console.warn("Receipts log query failed", e);
     } finally {
       setLoading(false);
     }

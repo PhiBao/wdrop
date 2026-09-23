@@ -1,22 +1,21 @@
 "use client";
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { fallback, http } from "viem";
-import { WagmiProvider, createConfig } from "wagmi";
+import { WagmiProvider, createConfig, useAccount, useChainId, useSwitchChain } from "wagmi";
 import { injected, walletConnect } from "wagmi/connectors";
 import { arcMainnet, arcTestnet } from "@/lib/arc";
 
-// RPC: optional primary + fallback (e.g. paid QuickNode as primary, public as
-// fallback) via env. When unset, wagmi uses the chain defaults (Circle public RPC).
+// RPC: ORDERED fallback — primary first, never latency-ranked. Ranking routes
+// users to the public RPC (often faster) which rate-limits aggressively.
+// QuickNode first (generous quota), public only if QN errors.
 function arcTransport() {
   const urls = [
     process.env.NEXT_PUBLIC_ARC_RPC_URL,
     process.env.NEXT_PUBLIC_ARC_RPC_FALLBACK,
   ].filter((u): u is string => !!u);
-  // rank:true routes to whichever endpoint is fastest from the user, with the
-  // other as automatic failover — paid QN for headroom, public as backup.
-  return urls.length ? fallback(urls.map((url) => http(url)), { rank: true }) : http();
+  return urls.length ? fallback(urls.map((url) => http(url))) : http();
 }
 
 const wcProjectId = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID;
@@ -38,7 +37,39 @@ export function Providers({ children }: { children: ReactNode }) {
   );
   return (
     <WagmiProvider config={config}>
-      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+      <QueryClientProvider client={queryClient}>
+        <AutoArc />
+        {children}
+      </QueryClientProvider>
     </WagmiProvider>
   );
+}
+
+/**
+ * Auto-switch to Arc on connect. One attempt per wallet+chain (tracked in a ref)
+ * so a rejection never loops prompts — the manual "Switch to Arc" button stays
+ * as backup everywhere.
+ */
+function AutoArc() {
+  const { address, isConnected } = useAccount();
+  const chainId = useChainId();
+  const { switchChain } = useSwitchChain();
+  const tried = useRef("");
+
+  useEffect(() => {
+    if (!isConnected || !address || chainId === arcMainnet.id) return;
+    const key = `${address}:${chainId}`;
+    if (tried.current === key) return;
+    tried.current = key;
+    try {
+      switchChain(
+        { chainId: arcMainnet.id },
+        { onError: () => {} }
+      );
+    } catch {
+      /* unsupported wallet — manual button remains */
+    }
+  }, [isConnected, address, chainId, switchChain]);
+
+  return null;
 }

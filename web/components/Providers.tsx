@@ -65,6 +65,18 @@ function AutoArc() {
   const tried = useRef("");
   const lastError = useRef("");
 
+  // Unconditional heartbeat: proves AutoArc is mounted and shows the state the
+  // effect is deciding on. A clean console previously meant "can't tell".
+  useEffect(() => {
+    console.info("[wdrop] wallet state", {
+      connected: isConnected,
+      chainId,
+      onArc: chainId === arcMainnet.id,
+      address: address ?? null,
+      connector: connector?.name ?? null,
+    });
+  }, [isConnected, chainId, address, connector]);
+
   useEffect(() => {
     if (!isConnected || !address || chainId === arcMainnet.id) return;
     if (isPending) return;

@@ -179,8 +179,8 @@ for everyday P2P commerce, agent spending, and merchant checkout.
 ## Roadmap
 
 - [x] Escrow + web app live on Arc mainnet with cross-wallet proof
-- [ ] 90s demo video + DoraHacks submission (in progress)
-- [ ] WalletConnect polish + custom domain (+ referrer whitelist update)
+- [x] WalletConnect + always-on wallet-truth network guard
+- [ ] Custom domain
 - [ ] Spending-cap vaults (kids + AI agents, same primitive)
 - [ ] Gift skins (expiring/quiz-gated envelopes — distribution play)
 - [ ] Arbiter dispute queue UI (per-drop `resolve` path)

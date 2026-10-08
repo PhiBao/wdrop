@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Receipts flow</title>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --color-paper:   #fafafa;
+      --color-ink:     #18181b;
+      --color-muted:   #52525b;
+      --color-accent:  #4d7c0f;
+      --font-sans:     'Geist', system-ui, sans-serif;
+      --font-serif:    'Instrument Serif', serif;
+      --font-mono:     'Geist Mono', ui-monospace, monospace;
+    }
+    body {
+      font-family: var(--font-sans);
+      background: var(--color-paper);
+      color: var(--color-ink);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 3rem 2rem;
+    }
+    .frame { max-width: 1200px; width: 100%; }
+    .diagram-container { width: 100%; overflow-x: auto; }
+    .eyebrow {
+      font-family: var(--font-mono);
+      font-size: 0.66rem;
+      font-weight: 500;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--color-muted);
+      margin-bottom: 0.5rem;
+    }
+    h1 {
+      font-family: var(--font-serif);
+      font-size: clamp(1.5rem, 2.4vw + 0.75rem, 2rem);
+      font-weight: 400;
+      letter-spacing: -0.02em;
+      line-height: 1.15;
+      color: var(--color-ink);
+      margin-bottom: 1.5rem;
+    }
+    svg { width: 100%; min-width: 960px; display: block; }
+    @media print {
+      .diagram-container { overflow-x: visible; }
+      svg { min-width: 0; }
+    }
+  </style>
+</head>
+<body>
+  <div class="frame">
+    <p class="eyebrow">Data flow · wdrop</p>
+    <h1>Receipts — proof, not analytics</h1>
+
+    <div class="diagram-container">
+      <svg viewBox="0 0 960 400" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="receipts-flow-title receipts-flow-desc">
+        <title id="receipts-flow-title">Receipts flow</title>
+        <desc id="receipts-flow-desc">Data flow showing Arc event logs parsed into a wallet-scoped receipts table and exported as CSV, with every row deep-linking to the Arc explorer.</desc>
+        <defs>
+          <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#52525b"/></marker>
+        </defs>
+
+        <rect width="100%" height="100%" fill="#fafafa"/>
+
+        <!-- ARROWS -->
+        <line x1="240" y1="200" x2="300" y2="200" stroke="#52525b" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <line x1="480" y1="200" x2="540" y2="200" stroke="#52525b" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <line x1="720" y1="200" x2="780" y2="200" stroke="#52525b" stroke-width="1.2" marker-end="url(#arrow)"/>
+
+        <!-- ARROW LABELS -->
+        <rect x="254" y="180" width="32" height="12" rx="2" fill="#fafafa"/>
+        <text x="270" y="190" fill="#52525b" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">READ</text>
+
+        <rect x="492" y="180" width="36" height="12" rx="2" fill="#fafafa"/>
+        <text x="510" y="190" fill="#52525b" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">BUILD</text>
+
+        <rect x="726" y="180" width="48" height="12" rx="2" fill="#fafafa"/>
+        <text x="750" y="190" fill="#52525b" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">DOWNLOAD</text>
+
+        <!-- ANNOTATION CALLOUTS (italic serif asides) -->
+        <text x="60" y="340" fill="#18181b" font-size="14" font-style="italic"
+              font-family="'Instrument Serif', serif">only the connected wallet's own actions</text>
+        <path d="M 316 334 Q 356 300 388 246" fill="none"
+              stroke="rgba(24,24,27,0.40)" stroke-width="1" stroke-dasharray="4,3"/>
+        <circle cx="390" cy="244" r="2" fill="#18181b"/>
+
+        <text x="900" y="340" fill="#18181b" font-size="14" font-style="italic" text-anchor="end"
+              font-family="'Instrument Serif', serif">every row deep-links to explorer.arc.io/tx/&lt;hash&gt;</text>
+        <path d="M 592 334 Q 626 296 634 246" fill="none"
+              stroke="rgba(24,24,27,0.40)" stroke-width="1" stroke-dasharray="4,3"/>
+        <circle cx="636" cy="244" r="2" fill="#18181b"/>
+
+        <!-- NODES -->
+        <!-- Node: Arc event logs (external) -->
+        <rect x="60" y="160" width="180" height="80" rx="6" fill="#fafafa"/>
+        <rect x="60" y="160" width="180" height="80" rx="6" fill="rgba(24,24,27,0.03)" stroke="rgba(24,24,27,0.30)" stroke-width="1"/>
+        <rect x="68" y="168" width="28" height="12" rx="2" fill="transparent" stroke="rgba(24,24,27,0.30)" stroke-width="0.8"/>
+        <text x="82" y="177" fill="#52525b" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">EXT</text>
+        <text x="150" y="204" fill="#18181b" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Arc event logs</text>
+        <text x="150" y="222" fill="#52525b" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">from deploy block</text>
+
+        <!-- Node: parseEventLogs (backend) -->
+        <rect x="300" y="160" width="180" height="80" rx="6" fill="#fafafa"/>
+        <rect x="300" y="160" width="180" height="80" rx="6" fill="#ffffff" stroke="#18181b" stroke-width="1"/>
+        <rect x="308" y="168" width="36" height="12" rx="2" fill="transparent" stroke="rgba(24,24,27,0.40)" stroke-width="0.8"/>
+        <text x="326" y="177" fill="#18181b" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">PARSE</text>
+        <text x="390" y="204" fill="#18181b" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">parseEventLogs</text>
+        <text x="390" y="222" fill="#52525b" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">wallet-scoped filter</text>
+
+        <!-- Node: Receipts table (focal) -->
+        <rect x="540" y="160" width="180" height="80" rx="6" fill="#fafafa"/>
+        <rect x="540" y="160" width="180" height="80" rx="6" fill="rgba(77,124,15,0.08)" stroke="#4d7c0f" stroke-width="1"/>
+        <rect x="548" y="168" width="28" height="12" rx="2" fill="transparent" stroke="rgba(77,124,15,0.50)" stroke-width="0.8"/>
+        <text x="562" y="177" fill="#4d7c0f" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">UI</text>
+        <text x="630" y="204" fill="#18181b" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Receipts table</text>
+        <text x="630" y="222" fill="#52525b" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">event · drop · USDC · tx</text>
+
+        <!-- Node: CSV export (backend) -->
+        <rect x="780" y="160" width="120" height="80" rx="6" fill="#fafafa"/>
+        <rect x="780" y="160" width="120" height="80" rx="6" fill="#ffffff" stroke="#18181b" stroke-width="1"/>
+        <rect x="788" y="168" width="28" height="12" rx="2" fill="transparent" stroke="rgba(24,24,27,0.40)" stroke-width="0.8"/>
+        <text x="802" y="177" fill="#18181b" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">CSV</text>
+        <text x="840" y="204" fill="#18181b" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">CSV export</text>
+        <text x="840" y="222" fill="#52525b" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">for the books</text>
+      </svg>
+    </div>
+  </div>
+</body>
+</html>

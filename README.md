@@ -57,54 +57,29 @@ Deliberately. Small real system > large fake system.
 
 ## How it works (60-second version)
 
-No backend exists — static UI + wallet calls + one escrow contract on Arc. Secrets never leave
-the browser (URL fragment only); memos stay in localStorage.
+No application backend, no database — a static UI, one same-origin RPC proxy, and one escrow
+contract on Arc. Secrets never leave the browser (URL fragment only); memos stay in localStorage.
 
-```mermaid
-flowchart LR
-    subgraph Browser["Browser"]
-        UI["wdrop app<br/>create · claim · undo · receipts"]
-        WALLET["Wallet<br/>injected or WalletConnect"]
-    end
-    subgraph ARC["Arc mainnet · 5042"]
-        WD["WDrop escrow<br/>0xEfFd…60F7"]
-        USDC["USDC<br/>payment + gas"]
-    end
-    UI --> WALLET
-    WALLET -->|"approve + create<br/>claim / reclaim"| WD
-    WD <--> USDC
-    WD -->|"every step"| EXPL["Explorer proof"]
-```
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/diagrams/system-overview-dark.png">
+  <img alt="wdrop system overview: browser app and wallet, a same-origin RPC proxy, Arc RPC upstreams, and the WDrop escrow holding USDC on Arc mainnet" src="docs/diagrams/system-overview.png">
+</picture>
 
 A drop lives in exactly one state at a time, and each `id` is single-use — once it leaves
 `Locked` it can never move again:
 
-```mermaid
-stateDiagram-v2
-    [*] --> Locked : create + lock USDC
-    Locked --> Claimed : claim with secret
-    Locked --> Reclaimed : sender undo, anytime
-    Locked --> Swept : expired → anyone sweeps back
-    Claimed --> [*]
-    Reclaimed --> [*]
-    Swept --> [*]
-```
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/diagrams/drop-lifecycle-dark.png">
+  <img alt="Drop lifecycle: Locked moves to exactly one of Claimed, Reclaimed, or Swept — every exit is one-way" src="docs/diagrams/drop-lifecycle.png">
+</picture>
 
 The receiver sees the **real onchain amount before connecting** — a "$100 (actually $1)" scam
 link is exposed without spending gas:
 
-```mermaid
-sequenceDiagram
-    autonumber
-    actor S as Sender
-    actor R as Receiver
-    participant WD as WDrop (Arc)
-    S ->> WD : approve + create → claim link
-    S ->> R : shares link (any channel)
-    R ->> WD : opens link, reads amount onchain
-    R ->> WD : claim(secret) → USDC in <1s
-    WD -->> S : or sender reclaims / expiry sweeps back
-```
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/diagrams/claim-sequence-dark.png">
+  <img alt="Claim flow: sender locks USDC and shares a link, receiver opens it, reads the amount onchain, and claims it in one signature — USDC arrives in under a second" src="docs/diagrams/claim-sequence.png">
+</picture>
 
 Full diagrams (undo/expiry paths, trust boundaries, receipts, deployment):
 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).

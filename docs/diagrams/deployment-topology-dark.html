@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Deployment topology</title>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --color-paper:   #09090b;
+      --color-ink:     #f4f4f5;
+      --color-muted:   #a1a1aa;
+      --color-accent:  #bef264;
+      --font-sans:     'Geist', system-ui, sans-serif;
+      --font-serif:    'Instrument Serif', serif;
+      --font-mono:     'Geist Mono', ui-monospace, monospace;
+    }
+    body {
+      font-family: var(--font-sans);
+      background: var(--color-paper);
+      color: var(--color-ink);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 3rem 2rem;
+    }
+    .frame { max-width: 1200px; width: 100%; }
+    .diagram-container { width: 100%; overflow-x: auto; }
+    .eyebrow {
+      font-family: var(--font-mono);
+      font-size: 0.66rem;
+      font-weight: 500;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--color-muted);
+      margin-bottom: 0.5rem;
+    }
+    h1 {
+      font-family: var(--font-serif);
+      font-size: clamp(1.5rem, 2.4vw + 0.75rem, 2rem);
+      font-weight: 400;
+      letter-spacing: -0.02em;
+      line-height: 1.15;
+      color: var(--color-ink);
+      margin-bottom: 1.5rem;
+    }
+    svg { width: 100%; min-width: 960px; display: block; }
+    @media print {
+      .diagram-container { overflow-x: visible; }
+      svg { min-width: 0; }
+    }
+  </style>
+</head>
+<body>
+  <div class="frame">
+    <p class="eyebrow">Deployment · wdrop</p>
+    <h1>Deployment topology</h1>
+
+    <div class="diagram-container">
+      <svg viewBox="0 0 960 560" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="deployment-topology-dark-title deployment-topology-dark-desc">
+        <title id="deployment-topology-dark-title">Deployment topology</title>
+        <desc id="deployment-topology-dark-desc">Deployment diagram showing GitHub pushing to Vercel, production environment variables feeding the deployment, a user browser connecting over HTTPS, and the server-side RPC proxy reaching QuickNode and the public fallback on Arc.</desc>
+        <defs>
+          <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#a1a1aa"/></marker>
+          <marker id="arrow-link" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#60a5fa"/></marker>
+        </defs>
+
+        <rect width="100%" height="100%" fill="#09090b"/>
+
+        <!-- ARROWS (before nodes) -->
+        <!-- GitHub → Vercel -->
+        <line x1="240" y1="110" x2="340" y2="110" stroke="#a1a1aa" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <!-- Vercel → RPC upstreams -->
+        <line x1="620" y1="110" x2="720" y2="110" stroke="#60a5fa" stroke-width="1.2" marker-end="url(#arrow-link)"/>
+        <!-- User → Vercel (up then right into left edge) -->
+        <path d="M 150,330 V 178 Q 150,170 158,170 H 340"
+              fill="none" stroke="#a1a1aa" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <!-- ENV → Vercel (up into bottom edge) -->
+        <line x1="480" y1="330" x2="480" y2="190" stroke="#a1a1aa" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <!-- RPC upstreams → Arc mainnet -->
+        <line x1="820" y1="150" x2="820" y2="330" stroke="#a1a1aa" stroke-width="1.2" marker-end="url(#arrow)"/>
+
+        <!-- ARROW LABELS -->
+        <rect x="256" y="90" width="68" height="12" rx="2" fill="#09090b"/>
+        <text x="290" y="100" fill="#a1a1aa" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">PUSH · BUILD</text>
+
+        <rect x="638" y="90" width="64" height="12" rx="2" fill="#09090b"/>
+        <text x="670" y="100" fill="#60a5fa" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">SERVER-SIDE</text>
+
+        <rect x="158" y="230" width="44" height="12" rx="2" fill="#09090b"/>
+        <text x="180" y="240" fill="#a1a1aa" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">HTTPS</text>
+
+        <rect x="488" y="250" width="56" height="12" rx="2" fill="#09090b"/>
+        <text x="516" y="260" fill="#a1a1aa" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">ENV VARS</text>
+
+        <rect x="828" y="230" width="60" height="12" rx="2" fill="#09090b"/>
+        <text x="858" y="240" fill="#a1a1aa" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">JSON-RPC</text>
+
+        <!-- NODES -->
+        <!-- GitHub (external) -->
+        <rect x="60" y="70" width="180" height="80" rx="6" fill="#09090b"/>
+        <rect x="60" y="70" width="180" height="80" rx="6" fill="rgba(244,244,245,0.03)" stroke="rgba(244,244,245,0.30)" stroke-width="1"/>
+        <rect x="68" y="78" width="28" height="12" rx="2" fill="transparent" stroke="rgba(244,244,245,0.30)" stroke-width="0.8"/>
+        <text x="82" y="87" fill="#a1a1aa" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">EXT</text>
+        <text x="150" y="114" fill="#f4f4f5" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">GitHub</text>
+        <text x="150" y="132" fill="#a1a1aa" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">PhiBao/wdrop</text>
+
+        <!-- Vercel (focal) -->
+        <rect x="340" y="70" width="280" height="120" rx="6" fill="#09090b"/>
+        <rect x="340" y="70" width="280" height="120" rx="6" fill="rgba(190,242,100,0.08)" stroke="#bef264" stroke-width="1"/>
+        <rect x="348" y="78" width="28" height="12" rx="2" fill="transparent" stroke="rgba(190,242,100,0.50)" stroke-width="0.8"/>
+        <text x="362" y="87" fill="#bef264" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">HOST</text>
+        <text x="480" y="126" fill="#f4f4f5" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Vercel</text>
+        <text x="480" y="146" fill="#a1a1aa" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">wdrop.vercel.app</text>
+        <text x="480" y="164" fill="#a1a1aa" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">static UI + /api/rpc</text>
+
+        <!-- RPC upstreams (external) -->
+        <rect x="720" y="70" width="200" height="80" rx="6" fill="#09090b"/>
+        <rect x="720" y="70" width="200" height="80" rx="6" fill="rgba(244,244,245,0.03)" stroke="rgba(244,244,245,0.30)" stroke-width="1"/>
+        <rect x="728" y="78" width="28" height="12" rx="2" fill="transparent" stroke="rgba(244,244,245,0.30)" stroke-width="0.8"/>
+        <text x="742" y="87" fill="#a1a1aa" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">EXT</text>
+        <text x="820" y="114" fill="#f4f4f5" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">RPC upstreams</text>
+        <text x="820" y="132" fill="#a1a1aa" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">QuickNode · public fallback</text>
+
+        <!-- User (input) -->
+        <rect x="60" y="330" width="180" height="80" rx="6" fill="#09090b"/>
+        <rect x="60" y="330" width="180" height="80" rx="6" fill="rgba(161,161,170,0.10)" stroke="#a1a1aa" stroke-width="1"/>
+        <rect x="68" y="338" width="28" height="12" rx="2" fill="transparent" stroke="rgba(161,161,170,0.50)" stroke-width="0.8"/>
+        <text x="82" y="347" fill="#a1a1aa" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">USR</text>
+        <text x="150" y="374" fill="#f4f4f5" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">User / judge</text>
+        <text x="150" y="392" fill="#a1a1aa" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">any browser + wallet</text>
+
+        <!-- Production env (store) -->
+        <rect x="340" y="330" width="280" height="80" rx="6" fill="#09090b"/>
+        <rect x="340" y="330" width="280" height="80" rx="6" fill="rgba(244,244,245,0.05)" stroke="#a1a1aa" stroke-width="1"/>
+        <rect x="348" y="338" width="36" height="12" rx="2" fill="transparent" stroke="rgba(161,161,170,0.50)" stroke-width="0.8"/>
+        <text x="366" y="347" fill="#a1a1aa" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">STORE</text>
+        <text x="480" y="374" fill="#f4f4f5" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Production env</text>
+        <text x="480" y="392" fill="#a1a1aa" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">contract · RPC urls · block</text>
+
+        <!-- Arc mainnet (external) -->
+        <rect x="720" y="330" width="200" height="80" rx="6" fill="#09090b"/>
+        <rect x="720" y="330" width="200" height="80" rx="6" fill="rgba(244,244,245,0.03)" stroke="rgba(244,244,245,0.30)" stroke-width="1"/>
+        <rect x="728" y="338" width="28" height="12" rx="2" fill="transparent" stroke="rgba(244,244,245,0.30)" stroke-width="0.8"/>
+        <text x="742" y="347" fill="#a1a1aa" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">ARC</text>
+        <text x="820" y="374" fill="#f4f4f5" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Arc mainnet · 5042</text>
+        <text x="820" y="392" fill="#a1a1aa" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">escrow + USDC</text>
+
+        <!-- LEGEND -->
+        <line x1="40" y1="480" x2="920" y2="480" stroke="rgba(244,244,245,0.10)" stroke-width="0.8"/>
+        <text x="40" y="496" fill="#a1a1aa" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.18em">LEGEND</text>
+
+        <rect x="40" y="508" width="14" height="10" rx="2" fill="rgba(190,242,100,0.08)" stroke="#bef264" stroke-width="1"/>
+        <text x="62" y="517" fill="#a1a1aa" font-size="8.5" font-family="'Geist', sans-serif">Host (focal)</text>
+
+        <rect x="200" y="508" width="14" height="10" rx="2" fill="rgba(244,244,245,0.05)" stroke="#a1a1aa" stroke-width="1"/>
+        <text x="222" y="517" fill="#a1a1aa" font-size="8.5" font-family="'Geist', sans-serif">Env (store)</text>
+
+        <rect x="340" y="508" width="14" height="10" rx="2" fill="rgba(244,244,245,0.03)" stroke="rgba(244,244,245,0.30)" stroke-width="1"/>
+        <text x="362" y="517" fill="#a1a1aa" font-size="8.5" font-family="'Geist', sans-serif">External</text>
+
+        <rect x="470" y="508" width="14" height="10" rx="2" fill="rgba(161,161,170,0.10)" stroke="#a1a1aa" stroke-width="1"/>
+        <text x="492" y="517" fill="#a1a1aa" font-size="8.5" font-family="'Geist', sans-serif">User (input)</text>
+
+        <line x1="620" y1="514" x2="648" y2="514" stroke="#60a5fa" stroke-width="1.2" marker-end="url(#arrow-link)"/>
+        <text x="656" y="517" fill="#a1a1aa" font-size="8.5" font-family="'Geist', sans-serif">RPC (server-side)</text>
+      </svg>
+    </div>
+  </div>
+</body>
+</html>

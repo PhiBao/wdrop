@@ -1,87 +1,36 @@
 # ARCHITECTURE.md — wdrop
 
-How wdrop is put together, what lives where, and where trust sits. All diagrams are
-Mermaid — they render directly on GitHub.
+How wdrop is put together, what lives where, and where trust sits. Diagrams are exported
+images (light + dark, source HTML in `diagrams/`) so they render on GitHub in either theme.
 
 ## 1. System overview
 
-```mermaid
-flowchart LR
-    subgraph Browser["Browser (no backend exists)"]
-        UI["Next.js app<br/>wdrop.vercel.app<br/>/ = create · my drops · receipts<br/>/claim/[id] = claim"]
-        WALLET["Wallet<br/>injected (MetaMask) or<br/>WalletConnect QR"]
-        LS[("localStorage<br/>secret backup + memo<br/>this browser only")]
-    end
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="diagrams/system-overview-dark.png">
+  <img alt="wdrop system overview: browser app and wallet, a same-origin RPC proxy, Arc RPC upstreams, and the WDrop escrow holding USDC on Arc mainnet" src="diagrams/system-overview.png">
+</picture>
 
-    subgraph RPC["Arc RPC layer"]
-        QN["QuickNode<br/>arc-mainnet<br/>primary · referrer-locked"]
-        PUB["Circle public RPC<br/>rpc.mainnet.arc.io<br/>automatic failover"]
-    end
-
-    subgraph ARC["Arc mainnet · chain 5042"]
-        WD["WDrop escrow<br/>0xEfFd…60F7<br/>create · claim · reclaim<br/>sweepExpired · resolve"]
-        USDC["USDC<br/>0x3600…0000<br/>6dp · also the gas token"]
-        EXPL["Explorer<br/>explorer.arc.io<br/>proof for every step"]
-    end
-
-    UI --> WALLET
-    UI <--> LS
-    UI -->|"viem/wagmi<br/>latency-ranked fallback"| QN
-    UI -->|"failover"| PUB
-    QN --> ARC
-    PUB --> ARC
-    WD <--> USDC
-    WD -->|"Created · Claimed<br/>Reclaimed · Swept"| EXPL
-```
-
-Key property: **there is no server.** The Next.js app is static UI + wallet calls. Secrets and
-memos never leave the browser (secret travels in the URL fragment `#k=`, which browsers never
-send anywhere). The contract is the only shared state.
+Key property: **there is no application backend** — no database, no accounts, no server-side
+state. The Next.js app is static UI plus one stateless `/api/rpc` relay that keeps the paid RPC
+token server-side. Secrets and memos never leave the browser (the secret travels in the URL
+fragment `#k=`, which browsers never send anywhere). The contract is the only shared state.
 
 ## 2. Drop lifecycle (contract state machine)
 
-```mermaid
-stateDiagram-v2
-    [*] --> Locked : create(token, amount,<br/>keccak(secret), ttl)
-    Locked --> Claimed : claim(id, secret)<br/>secret matches, not expired
-    Locked --> Claimed : resolve(id, to)<br/>arbiter only
-    Locked --> Reclaimed : reclaim(id)<br/>sender only, anytime
-    Locked --> Swept : sweepExpired(id)<br/>anyone, after expiry
-    Locked --> Locked : claim after expiry<br/>reverts (use reclaim/sweep)
-    Claimed --> [*]
-    Reclaimed --> [*]
-    Swept --> [*]
-```
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="diagrams/drop-lifecycle-dark.png">
+  <img alt="Drop lifecycle: Locked moves to exactly one of Claimed, Reclaimed, or Swept — every exit is one-way" src="diagrams/drop-lifecycle.png">
+</picture>
 
 Every transition emits an event (`Created / Claimed / Reclaimed / Swept / Resolved`) and each
 `id` is single-use — once it leaves `Locked` it can never move again (replay-safe by construction).
 
 ## 3. Happy path: lock → share → claim
 
-```mermaid
-sequenceDiagram
-    autonumber
-    actor S as Sender
-    actor R as Receiver
-    participant App as wdrop app
-    participant W as Sender wallet
-    participant WD as WDrop (Arc)
-    participant W2 as Receiver wallet
-
-    S ->> App : amount + expiry + memo
-    App ->> W : approve(USDC, exact amount)
-    W ->> WD : create(USDC, amount, keccak(secret), ttl)
-    WD -->> App : Created(id) event
-    App ->> S : claim link<br/>/claim/{id}#k={secret} (auto-copied)
-    S ->> R : shares link (any channel)
-    R ->> App : opens link
-    App ->> WD : getDrop(id) + isClaimable(id)
-    WD -->> App : amount, expiry, status
-    App ->> R : shows REAL onchain amount<br/>before wallet connects
-    R ->> W2 : claim(id, secret)
-    W2 ->> WD : claim tx (gas in USDC)
-    WD -->> W2 : USDC payout + Claimed event
-```
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="diagrams/claim-sequence-dark.png">
+  <img alt="Claim flow: sender locks USDC and shares a link, receiver opens it, reads the amount onchain, and claims it in one signature — USDC arrives in under a second" src="diagrams/claim-sequence.png">
+</picture>
 
 Notes:
 - The claim page displays the amount from chain **before** connect — a mismatched
@@ -93,26 +42,10 @@ Notes:
 
 ## 4. Undo + expiry paths
 
-```mermaid
-sequenceDiagram
-    autonumber
-    actor S as Sender
-    participant App as wdrop app
-    participant W as Sender wallet
-    participant WD as WDrop (Arc)
-
-    alt Sender undo (anytime before claim)
-        S ->> App : My drops → Reclaim
-        App ->> W : reclaim(id)
-        W ->> WD : reclaim tx
-        WD -->> S : full amount back + Reclaimed
-    else Drop expires unclaimed
-        S ->> App : My drops → Sweep expired back
-        App ->> W : sweepExpired(id)
-        W ->> WD : sweep tx (permissionless — anyone can call)
-        WD -->> S : full amount back + Swept
-    end
-```
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="diagrams/undo-expiry-dark.png">
+  <img alt="Two alternative paths for returning a locked drop to its sender: sender reclaim before claim, or anyone sweeping after expiry" src="diagrams/undo-expiry.png">
+</picture>
 
 ## 5. Trust boundaries
 
@@ -121,7 +54,7 @@ sequenceDiagram
 | WDrop contract (Arc) | Locked USDC, claim hashes, expiries | Code only. Owner can't move funds (only ≤1% fee on claim). No upgradeability, no selfdestruct |
 | Sender browser (localStorage) | Claim secret backup, private memo | Same-origin. Lost browser = link still works if URL was shared; unshared + lost = funds locked until expiry, then sweepable |
 | Claim link URL | `id` + secret in `#k=` fragment | Bearer model: anyone holding the full link can claim. Fragments never hit servers or logs |
-| RPC layer (QN + public) | Nothing (transport only) | QN token is referrer-locked to `wdrop.vercel.app` + `localhost`; scraped tokens get 401 |
+| `/api/rpc` relay (Vercel) | Paid RPC token (server-side env) | Stateless forwarder: JSON-RPC in, JSON-RPC out, 16 KB body cap. Token never reaches the browser bundle |
 | Wallet (MetaMask / WC) | Keys, signing | Standard EOA trust. Exact-amount approvals only, never unlimited |
 
 Known limits (disclosed in `SECURITY.md`, not hidden): bearer-link claim race in the public
@@ -130,14 +63,10 @@ commit-reveal), no onchain amount privacy (Arc view-keys are roadmap), receiver 
 
 ## 6. Receipts (proof, not analytics)
 
-```mermaid
-flowchart LR
-    LOGS["Arc event logs<br/>from deploy block 21863551<br/>filtered to my address"]
-    PARSE["parseEventLogs<br/>Created · Claimed<br/>Reclaimed · Swept"]
-    TABLE["Receipts table<br/>event · drop · USDC · tx"]
-    CSV["CSV download<br/>for the books"]
-    LOGS --> PARSE --> TABLE --> CSV
-```
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="diagrams/receipts-flow-dark.png">
+  <img alt="Data flow: Arc event logs parsed into a wallet-scoped receipts table and exported as CSV, with every row deep-linking to the Arc explorer" src="diagrams/receipts-flow.png">
+</picture>
 
 Receipts query only the connected wallet's own actions. Per-drop claim status (including claims
 by others) lives in My drops. Every row deep-links to `explorer.arc.io/tx/<hash>`.
@@ -154,32 +83,26 @@ wdrop/
 └── web/                        Next.js 16 + TS + viem/wagmi
     ├── app/page.tsx             home: pitch + CreateDrop + MyDrops + Receipts
     ├── app/claim/[id]/page.tsx  claim: onchain amount first, then connect, then claim
-    ├── components/Providers.tsx wagmi config: injected + WalletConnect,
-    │                            latency-ranked QN→public fallback transports
+    ├── app/api/rpc/route.ts     stateless same-origin JSON-RPC relay (token server-side)
+    ├── components/Providers.tsx wagmi config: injected + WalletConnect, /api/rpc transport
     ├── components/CreateDrop.tsx   approve-exact + simulate + create + auto-copy link
     ├── components/MyDrops.tsx      sender's drops + reclaim / sweep buttons
     ├── components/Receipts.tsx     own-action event log + CSV export
+    ├── components/NetworkBadge.tsx wallet-truth chain readout (bottom-left)
     └── lib/
         ├── arc.ts               chain 5042, USDC 0x3600…0000, contract addr, explorer links
         ├── abi.ts               contract ABI + named single-event ABIs (no magic indices)
+        ├── logs.ts              chunked, cached, bisecting getLogs scanner
+        ├── walletGuard.ts       wallet-truth chain id + ensureWalletChain before writes
         └── wdrop.ts             secret gen, keccak link builder, USDC formatting, CSV
 ```
 
 ## 8. Deployment topology
 
-```mermaid
-flowchart TB
-    GH["GitHub<br/>PhiBao/wdrop"]
-    VERCEL["Vercel<br/>wdrop.vercel.app<br/>static + dynamic /claim/[id]"]
-    ENV["Production env<br/>contract addr · QN URL<br/>fallback URL · deploy block"]
-    USER["Judge / user<br/>any browser + wallet"]
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="diagrams/deployment-topology-dark.png">
+  <img alt="Deployment topology: GitHub pushes to Vercel, production env vars feed the deployment, users connect over HTTPS, and the server-side RPC proxy reaches QuickNode and the public fallback on Arc" src="diagrams/deployment-topology.png">
+</picture>
 
-    GH -->|"push → auto-build<br/>(root dir: web)"| VERCEL
-    ENV --> VERCEL
-    USER --> VERCEL
-    VERCEL -->|"client-side RPC"| QN["QuickNode Arc<br/>referrer-locked"]
-    VERCEL -->|"failover"| PUB["public RPC"]
-```
-
-Build is `tsc` + `eslint` + static prerender; all chain reads happen client-side at runtime,
-so prerender never touches RPC.
+Build is `tsc` + `eslint` + static prerender; chain reads happen at runtime through the
+same-origin `/api/rpc` relay, so prerender never touches RPC.
